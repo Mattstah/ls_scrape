@@ -1,16 +1,14 @@
 import logging
+import selenium.webdriver
 import sqlite3
 import time
-
-from selenium import webdriver
-from selenium.webdriver.common.by import By
 
 SCRAPE_TARGET_URL = 'http://www.livescores.com'
 SQLITE_DB_NAME = 'livescores_event_urls.db'
 POLL_FREQUENCY_SECS = 5
 
 def create_browser():
-	return webdriver.PhantomJS()
+	return selenium.webdriver.PhantomJS()
 
 def kill_browser(browser):
 	browser.quit()
