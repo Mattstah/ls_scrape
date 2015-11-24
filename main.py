@@ -5,13 +5,12 @@ import time
 from selenium import webdriver
 from selenium.webdriver.common.by import By
 
-CHROMEDRIVER_PATH = './chromedriver'
 SCRAPE_TARGET_URL = 'http://www.livescores.com'
 SQLITE_DB_NAME = 'livescores_event_urls.db'
 POLL_FREQUENCY_SECS = 5
 
 def create_browser():
-	return webdriver.Chrome(executable_path=CHROMEDRIVER_PATH)
+	return webdriver.PhantomJS()
 
 def kill_browser(browser):
 	browser.quit()
