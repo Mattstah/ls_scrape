@@ -7,6 +7,12 @@ SCRAPE_TARGET_URL = 'http://www.livescores.com'
 SQLITE_DB_NAME = 'livescores_event_urls.db'
 POLL_FREQUENCY_SECS = 5
 
+logging.basicConfig(
+	level=logging.INFO,
+	format='%(asctime)s %(levelname)s: %(message)s'
+)
+logger = logging.getLogger(__name__)
+
 def create_browser():
 	return selenium.webdriver.PhantomJS()
 
@@ -24,7 +30,7 @@ def get_event_links(browser):
 		browser.find_elements_by_class_name('scorelink')
 	)
 
-	print "Loaded %s event links." % len(event_links)
+	logger.info("Loaded %s event links.", len(event_links))
 
 	return event_links
 
