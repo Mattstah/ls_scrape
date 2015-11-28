@@ -193,10 +193,9 @@ def main():
 	browser = create_browser()
 	sqlite_conn = sqlite3.connect(SQLITE_DB_NAME)
 
-	browser.get(SCRAPE_TARGET_URL)
-
 	try:
 		while True:
+			browser.get(SCRAPE_TARGET_URL)
 			logging.info("Loaded page %s", SCRAPE_TARGET_URL)
 
 			bs = BeautifulSoup.BeautifulSoup(browser.page_source)
