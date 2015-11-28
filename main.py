@@ -1,5 +1,7 @@
+import BeautifulSoup
 import logging
 import random
+import re
 import selenium.webdriver
 import sqlite3
 import time
@@ -27,18 +29,10 @@ def create_browser():
 
 	return selenium.webdriver.PhantomJS(desired_capabilities=dcap)
 
-def get_event_links(browser):
-	def get_href(elt):
-		return elt.get_attribute('href')
-
-	event_links = map(
-		get_href,
-		browser.find_elements_by_class_name('scorelink')
-	)
-
-	logger.info("Loaded %s event links.", len(event_links))
-
-	return event_links
+def get_event_links(bs):
+	return [
+		elt['href'] for elt in bs.findAll('a', {'class':'scorelink'})
+	]
 
 def save_event_links(sqlite_conn, event_links):
 	c = sqlite_conn.cursor()
@@ -53,38 +47,43 @@ def save_event_links(sqlite_conn, event_links):
 
 	sqlite_conn.commit()
 
-def get_event_states(browser):
+def get_event_states(bs):
 	states = []
 
-	rows = browser.find_element_by_class_name('content')
-	children = rows.find_elements_by_xpath('./*')
+	content = bs.find('div', {'class' : 'content'})
+	rows = content.findAll('div', {'class' : re.compile('.*row.*')})
 
 	country = None
 	league = None
 	start_date = None
 
-	for child in children:
-		child_class = child.get_attribute('class')
+	for row in rows:
+		row_class = row['class']
 
-		if 'row' not in child_class:
-			continue
+		if 'mt4' in row_class:
+			start_date = row.find(
+				'div',
+				{'class' : re.compile('.*right.*')}
+			).text
 
-		elif 'mt4' in child_class:
-			start_date = child.find_element_by_class_name('right').text
-			start_date = fmt_date(start_date)
+			if start_date == '':
+				start_date = None
 
-			left = child.find_element_by_class_name('left')
-			left = left.find_elements_by_css_selector('a')
+			else:
+				start_date = fmt_date(start_date)
 
-			country = left[0].text
-			league = left[1].text
+			left = row.find('div', {'class' : re.compile('.*left.*')})
+			links = left.findAll('a')
+
+			country = links[0].text
+			league = links[1].text
 
 		else:
-			ev_id = int(child.get_attribute('data-eid'))
+			ev_id = int(row['data-eid'])
 
 			logger.info("Processing state for ev_id %s.", ev_id)
 
-			state = process_event_state(child)
+			state = process_event_state(row)
 
 			ev_info = {
 				'ev_id' : ev_id,
@@ -117,20 +116,21 @@ def fmt_date(date):
 	return time.strftime("%Y-%m-%d", x)
 
 def process_event_state(raw_state):
-	secs = raw_state.find_element_by_class_name('min').text
-	scores = raw_state.find_element_by_class_name('sco')
+	secs = raw_state.find('div', {'class' : 'min'}).text
 
-	sl = scores.find_elements_by_class_name('scorelink')
+	scores = raw_state.find('div', {'class' : 'sco'})
+	sl = scores.find('a', {'class' : 'scorelink'})
 
 	if sl:
-		home_score, away_score = sl[0].text.split(' - ')
+		home_score, away_score = sl.text.split(' - ')
+
 	else:
 		home_score, away_score = scores.text.split(' - ')
 
 	home_score = int(home_score) if home_score != '?' else None
 	away_score = int(away_score) if away_score != '?' else None
 
-	teams = raw_state.find_elements_by_class_name('ply')
+	teams = raw_state.findAll('div', {'class' : re.compile('.*ply.*')})
 	home_team = teams[0].text
 	away_team = teams[1].text
 
@@ -196,11 +196,16 @@ def main():
 	try:
 		while True:
 			browser.get(SCRAPE_TARGET_URL)
+			logging.info("Loaded page %s", SCRAPE_TARGET_URL)
 
-			event_links = get_event_links(browser)
+			bs = BeautifulSoup.BeautifulSoup(browser.page_source)
+
+			event_links = get_event_links(bs)
+			logger.info("Loaded %s event links", len(event_links))
+
 			save_event_links(sqlite_conn, event_links)
 
-			event_states = get_event_states(browser)
+			event_states = get_event_states(bs)
 			save_event_states(sqlite_conn, event_states)
 
 			sleep_duration = random.randint(
