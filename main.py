@@ -45,9 +45,12 @@ def get_event_links(browser):
 def save_event_links(sqlite_conn, event_links):
 	c = sqlite_conn.cursor()
 
+	def extract_ev_id(event_link):
+		return event_link.split('/')[-2]
+
 	c.executemany(
-		"insert or replace into event_urls(url) values (?)",
-		[(event_link,) for event_link in event_links]
+		"insert or replace into event_urls(ev_id, url) values (?, ?)",
+		[(extract_ev_id(event_link), event_link) for event_link in event_links]
 	)
 
 	sqlite_conn.commit()
