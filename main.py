@@ -60,28 +60,28 @@ def get_event_states(bs):
 	for row in rows:
 		row_class = row['class']
 
-		if 'mt4' in row_class:
+		if 'mt4' in row_class or 'bt0' in row_class:
 			start_date = row.find(
 				'div',
 				{'class' : re.compile('.*right.*')}
 			).text
 
-			if start_date == '':
-				start_date = None
-
-			else:
+			if start_date != '':
 				start_date = fmt_date(start_date)
 
+		if 'mt4' in row_class:
 			left = row.find('div', {'class' : re.compile('.*left.*')})
 			links = left.findAll('a')
 
 			country = links[0].text
 			league = links[1].text
 
+		elif 'bt0' in row_class:
+			country = None
+			league = None
+
 		else:
 			ev_id = int(row['data-eid'])
-
-			logger.info("Processing state for ev_id %s.", ev_id)
 
 			state = process_event_state(row)
 
@@ -193,9 +193,10 @@ def main():
 	browser = create_browser()
 	sqlite_conn = sqlite3.connect(SQLITE_DB_NAME)
 
+	browser.get(SCRAPE_TARGET_URL)
+
 	try:
 		while True:
-			browser.get(SCRAPE_TARGET_URL)
 			logging.info("Loaded page %s", SCRAPE_TARGET_URL)
 
 			bs = BeautifulSoup.BeautifulSoup(browser.page_source)
