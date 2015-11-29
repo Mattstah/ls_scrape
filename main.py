@@ -29,24 +29,6 @@ def create_browser():
 
 	return selenium.webdriver.PhantomJS(desired_capabilities=dcap)
 
-def get_event_links(bs):
-	return [
-		elt['href'] for elt in bs.findAll('a', {'class':'scorelink'})
-	]
-
-def save_event_links(sqlite_conn, event_links):
-	c = sqlite_conn.cursor()
-
-	def extract_ev_id(event_link):
-		return int(event_link.split('/')[-2].split('-')[1])
-
-	c.executemany(
-		"insert or replace into ev_urls(ev_id, url) values (?, ?)",
-		[(extract_ev_id(event_link), event_link) for event_link in event_links]
-	)
-
-	sqlite_conn.commit()
-
 def get_event_states(bs):
 	states = []
 
@@ -83,7 +65,7 @@ def get_event_states(bs):
 		else:
 			ev_id = int(row['data-eid'])
 
-			state = process_event_state(row)
+			state = process_raw_event_state(row)
 
 			ev_info = {
 				'ev_id' : ev_id,
@@ -115,7 +97,7 @@ def fmt_date(date):
 
 	return time.strftime("%Y-%m-%d", x)
 
-def process_event_state(raw_state):
+def process_raw_event_state(raw_state):
 	secs = raw_state.find('div', {'class' : 'min'}).text
 
 	scores = raw_state.find('div', {'class' : 'sco'})
@@ -123,9 +105,11 @@ def process_event_state(raw_state):
 
 	if sl:
 		home_score, away_score = sl.text.split(' - ')
+		url = sl['href']
 
 	else:
 		home_score, away_score = scores.text.split(' - ')
+		url = None
 
 	home_score = int(home_score) if home_score != '?' else None
 	away_score = int(away_score) if away_score != '?' else None
@@ -135,6 +119,7 @@ def process_event_state(raw_state):
 	away_team = teams[1].text
 
 	state = {
+		'url' : url,
 		'home_team' : home_team,
 		'away_team' : away_team,
 		'home_score' : home_score,
@@ -187,6 +172,21 @@ def save_event_states(sqlite_conn, event_states):
 		[[event_state[x] for x in ev_state] for event_state in event_states]
 	)
 
+	ev_url = ['ev_id', 'url']
+
+	ev_url_sql = "insert or replace into ev_urls(%s) values (%s)" % (
+		','.join(ev_url),
+		','.join(['?'] * len(ev_url))
+	)
+
+	c.executemany(
+		ev_url_sql,
+		[
+			[event_state[x] for x in ev_url]
+			for event_state in event_states if event_state['url']
+		]
+	)
+
 	sqlite_conn.commit()
 
 def main():
@@ -200,12 +200,10 @@ def main():
 
 			bs = BeautifulSoup.BeautifulSoup(browser.page_source)
 
-			event_links = get_event_links(bs)
-			logger.info("Loaded %s event links", len(event_links))
-
-			save_event_links(sqlite_conn, event_links)
-
 			event_states = get_event_states(bs)
+
+			logger.info("Loaded %s events", len(event_states))
+
 			save_event_states(sqlite_conn, event_states)
 
 			sleep_duration = random.randint(
