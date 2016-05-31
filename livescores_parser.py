@@ -95,7 +95,7 @@ def parse_match(raw_match):
 
 	mins = raw_match.find('div', {'class' : 'min'}).text
 
-	if "'" in mins or mins in ('HT', 'FT'):
+	if "'" in mins or mins in ('HT', 'FT', 'AET'):
 		scores = raw_match.find('div', {'class' : 'sco'})
 		sl = scores.find('a', {'class' : 'scorelink'})
 
